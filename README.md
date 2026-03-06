@@ -118,7 +118,7 @@ FIELD_VALID,FIELD_DATETIME,FIELD_HC,FIELD_HWC,FIELD_METER,FIELD_COMMENT
 
 
 
-## 🇬🇧 english version
+## english version
 
 ### Description
 
