@@ -34,7 +34,7 @@ Bazuje na skrypcie Python autorstwa [andr2000](https://github.com/andr2000/ufh-c
 | ☀️🌙 **Motyw jasny/ciemny** | Przełącznik z zapamiętywaniem |
 | 🇵🇱🇬🇧 **Język PL/EN** | Przełącznik z zapamiętywaniem |
 | 🕐 **Ostatnie dane** | Automatyczne zapamiętywanie i szybkie wczytanie danych z poprzedniej sesji |
-| 🖥️ **Aplikacja desktopowa** - Windows, Linux lub przez przeglądarkę
+| 🖥️ **Aplikacja desktopowa i WEB** | Windows, Linux lub przez przeglądarkę
 
 ### Wymagany format CSV
 
