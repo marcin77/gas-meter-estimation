@@ -1,0 +1,9 @@
+const { contextBridge, ipcRenderer } = require('electron')
+
+console.log('Preload script loaded (CJS)')
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  saveData: (data) => ipcRenderer.invoke('save-data', data),
+  loadData: () => ipcRenderer.invoke('load-data'),
+  getUserDataPath: () => ipcRenderer.invoke('get-user-data-path')
+})
