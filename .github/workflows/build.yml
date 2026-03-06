@@ -19,37 +19,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug - list files (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          echo "📂 Listing files in root directory:"
-          ls -la
-          echo ""
-          echo "📂 Checking for package-lock.json:"
-          if [ -f package-lock.json ]; then
-            echo "✅ package-lock.json exists"
-            echo "📏 File size:"
-            ls -lh package-lock.json
-          else
-            echo "❌ package-lock.json NOT FOUND!"
-          fi
-
-      - name: Debug - list files (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          echo "📂 Listing files in root directory:"
-          dir
-          echo ""
-          echo "📂 Checking for package-lock.json:"
-          if (Test-Path package-lock.json) {
-            echo "✅ package-lock.json exists"
-            echo "📏 File size:"
-            Get-Item package-lock.json | Format-List Length,Name
-          } else {
-            echo "❌ package-lock.json NOT FOUND!"
-          }
-        shell: pwsh
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -62,6 +31,8 @@ jobs:
         run: npm run build
 
       - name: Build Electron app
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: npm run dist
 
       - name: Upload artifacts
