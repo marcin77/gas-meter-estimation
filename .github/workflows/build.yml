@@ -2,6 +2,7 @@ name: Build and Release
 
 on:
   push:
+    branches: [ main ]
     tags:
       - 'v*'
   workflow_dispatch:
@@ -18,7 +19,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug - list files
+      - name: Debug - list files (Unix)
+        if: runner.os != 'Windows'
         run: |
           echo "📂 Listing files in root directory:"
           ls -la
@@ -28,11 +30,25 @@ jobs:
             echo "✅ package-lock.json exists"
             echo "📏 File size:"
             ls -lh package-lock.json
-            echo "📝 First 10 lines:"
-            head -10 package-lock.json
           else
             echo "❌ package-lock.json NOT FOUND!"
           fi
+
+      - name: Debug - list files (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "📂 Listing files in root directory:"
+          dir
+          echo ""
+          echo "📂 Checking for package-lock.json:"
+          if (Test-Path package-lock.json) {
+            echo "✅ package-lock.json exists"
+            echo "📏 File size:"
+            Get-Item package-lock.json | Format-List Length,Name
+          } else {
+            echo "❌ package-lock.json NOT FOUND!"
+          }
+        shell: pwsh
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
