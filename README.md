@@ -100,6 +100,19 @@ Pobierz z Releases plik .dmg i uruchom.
 npm run electron
 ```
 
+
+### Odczyt danych 
+Powtarzaj te kroki przez kilka dni (przynajmniej przez tydzień, 2–5 razy dziennie), aby uzyskać wystarczającą ilość danych treningowych i testowych, dzięki którym model regresji liniowej będzie działał dokładnie. 
+
+1. Podejdź do licznika gazu i zrób zdjęcie wartości. 
+2. Przejdź do strony encji Home Assistant, znajdź encje dla czujników `PrEnergySumHc1` i `PrEnergySumHwc1` i zanotuj wartości najbliższe czasowi znacznika czasu zdjęcia zrobionego w kroku 1.
+3. Załaduj dane przykładowe, dodaj/edytuj wiersze odpowiednimi danymi, moższ też usunąc te niepotrzebne lub utworzyć ręcznie plik `meter_readings.csv` i go importować.
+4. jezeli masz juz odpowiednią ilośc danych kliknij 'Trenuj model'.
+5. Następnie wartości `Intercept` i `Współczynik HC i HWC` skopiuj i wklej do odpowiednich zmiennych w szablonie sensor.
+
+Odczytów należy dokonywać, gdy kocioł nie podgrzewa wody ani grzejników, ponieważ wartości `PrEnergySumHc1` i `PrEnergySumHwc1` rosną bardzo szybko.
+
+
 ### Wymagany format CSV
 
 ```csv
@@ -110,15 +123,15 @@ FIELD_VALID,FIELD_DATETIME,FIELD_HC,FIELD_HWC,FIELD_METER,FIELD_COMMENT
 ```
 | Kolumna | Typ | Opis |
 |---------|-----|------|
-| `FIELD_VALID` | `0/1` | Czy wiersz jest prawidłowy (1=tak, 0=nie) |
+| `FIELD_VALID` | `0/1` | Czy wartości wierszy są używane w obliczeniach modelu regresji liniowej, czy nie (1=tak, 0=nie) |
 | `FIELD_DATETIME` | `tekst` | Data i czas odczytu |
-| `FIELD_HC` | `liczba` | Heat Counter — licznik ciepła |
-| `FIELD_HWC` | `liczba` | Hot Water Counter — licznik ciepłej wody |
-| `FIELD_METER` | `liczba` | Odczyt gazomierza |
+| `FIELD_HC` | `liczba` | Wartość `PrEnergySumHc1` z kotła w momencie pobrania rzeczywistej wartości z gazomierza|
+| `FIELD_HWC` | `liczba` | Wartość `PrEnergySumHwc1` z kotła w momencie pobrania rzeczywistej wartości z gazomierza |
+| `FIELD_METER` | `liczba` | Rzeczywista wartość gazomierza |
 | `FIELD_COMMENT` | `tekst` | Komentarz (opcjonalny) |
 
 
-
+🇬🇧
 ## english version
 
 ### Description
@@ -212,6 +225,18 @@ Download the .dmg file from Releases and run.
 npm run electron
 ```
 
+### Reading the Data
+Repeat these steps for several days (at least a week, 2-5 times a day) to obtain enough training and test data for the linear regression model to perform accurately. 
+
+1. Go to the gas meter and take a photo of the values.
+2. Go to the Home Assistant entity page, find the entities for the `PrEnergySumHc1` and `PrEnergySumHwc1` sensors, and note the values ​​closest to the timestamp of the photo you took in step 1.
+3. Load the sample data, add/edit rows with the appropriate data, or delete unnecessary ones or manually create a `meter_readings.csv` file and import it.
+4. If you already have the appropriate amount of data, click 'Train model'.
+5. Then copy and paste the `Intercept` and `HC and HWC Coefficient` values ​​into the appropriate variables in the sensor template.
+
+You should take the readings when the boiler is not heating water or radiators as the `PrEnergySumHc1` and `PrEnergySumHwc1` values go up really quickly.
+
+   
 ### Required CSV Format
 
 ```csv
@@ -222,14 +247,12 @@ FIELD_VALID,FIELD_DATETIME,FIELD_HC,FIELD_HWC,FIELD_METER,FIELD_COMMENT
 ```
 | Kolumna | Typ | Opis |
 |---------|-----|------|
-| `FIELD_VALID` | `0/1` | Whether the row is valid (1=yes, 0=no) |
+| `FIELD_VALID` | `0/1` | This value defines if the rows' values are used in linear regression model calculations or not (1=yes, 0=no) |
 | `FIELD_DATETIME` | `tekst` | Reading date and time |
-| `FIELD_HC` | `liczba` | Heat Counter |
-| `FIELD_HWC` | `liczba` | Hot Water Counter |
-| `FIELD_METER` | `liczba` | Gas meter reading |
+| `FIELD_HC` | `liczba` | Value of a `PrEnergySumHc1` from the boiler at the time when you captured the actual gas meter value |
+| `FIELD_HWC` | `liczba` | Value of a `PrEnergySumHwc1` from the boiler at the time when you captured the actual gas meter value |
+| `FIELD_METER` | `liczba` | Actual value of the gas meter |
 | `FIELD_COMMENT` | `tekst` | Comment (optional) |
-
-
 
 
 
