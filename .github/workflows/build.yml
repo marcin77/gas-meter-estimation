@@ -74,35 +74,37 @@ jobs:
       - name: List files
         run: find artifacts -type f
 
+      - name: Extract changelog
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          VERSION="${TAG_NAME#v}"
+          sed -n "/## \[${VERSION}\]/,/## \[/p" CHANGELOG.md | head -n -1 > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "Release ${TAG_NAME}" > release_notes.md
+          fi
+          echo "--- Release notes ---"
+          cat release_notes.md
+
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG_NAME="${GITHUB_REF_NAME}"
-          VERSION="${TAG_NAME#v}"
-          echo "🚀 Creating release for tag: $TAG_NAME"
-          
+
           gh release delete "$TAG_NAME" --yes 2>/dev/null || true
-          
-          # Wyciągnij opis z CHANGELOG.md
-          NOTES=$(sed -n "/## \[${VERSION}\]/,/## \[/p" CHANGELOG.md | head -n -1)
-          
-          if [ -z "$NOTES" ]; then
-            NOTES="Release ${TAG_NAME}"
-          fi
-          
+
           FILES=()
           while IFS= read -r -d '' file; do
             FILES+=("$file")
             echo "  📦 $file"
           done < <(find artifacts -type f \( -name "*.exe" -o -name "*.AppImage" -o -name "*.dmg" \) -print0)
-          
+
           if [ ${#FILES[@]} -eq 0 ]; then
             echo "❌ No files found!"
             exit 1
           fi
-          
+
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
-            --notes "$NOTES" \
+            --notes-file release_notes.md \
             "${FILES[@]}"
