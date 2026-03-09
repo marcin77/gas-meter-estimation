@@ -100,7 +100,7 @@ jobs:
           done < <(find artifacts -type f \( -name "*.exe" -o -name "*.AppImage" -o -name "*.dmg" \) -print0)
 
           if [ ${#FILES[@]} -eq 0 ]; then
-            echo "❌ No files found!!"
+            echo "❌ No files found!"
             exit 1
           fi
 
