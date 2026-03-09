@@ -105,8 +105,4 @@ jobs:
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
             --notes "$NOTES" \
-<<<<<<< HEAD
             "${FILES[@]}"
-=======
-            "${FILES[@]}"
->>>>>>> ea9c3c4e062e2082598f828738076a7961cdfd99
