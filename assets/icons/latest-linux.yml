@@ -1,0 +1,9 @@
+version: 1.0.0
+files:
+  - url: Gas-Meter-Estimation-1.0.0.AppImage
+    sha512: ooZpwbVpOjEud1+cn8io4e3cu+629m2z80oFsbDGgOH9VAA//lWulEzuVLGf9g7Thnl7RzeNk3uN8vExR9s3rA==
+    size: 122645562
+    blockMapSize: 130126
+path: Gas-Meter-Estimation-1.0.0.AppImage
+sha512: ooZpwbVpOjEud1+cn8io4e3cu+629m2z80oFsbDGgOH9VAA//lWulEzuVLGf9g7Thnl7RzeNk3uN8vExR9s3rA==
+releaseDate: '2026-03-06T15:32:59.943Z'

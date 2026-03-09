@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+package-lock.json
 
 # Build outputs
 dist/
@@ -11,6 +12,7 @@ dist_*
 *.deb
 *.snap
 *.flatpak
+*.sh
 
 # IDE
 .vscode/

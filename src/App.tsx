@@ -1,3 +1,7 @@
+const APP_VERSION = "0.0.1";
+const GITHUB_REPO = "marcin77/gas-meter-estimation";
+
+/* ────────── React ────────── */
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import Papa from "papaparse";
 import {
@@ -112,7 +116,14 @@ const LANG_PL = {
   about: "O programie",
   help_title: "Instrukcja / Pomoc",
   about_title: "O programie / Informacje",
+  support_project: "Wesprzyj projekt",
   close: "Zamknij",
+  update_available: "Dostępna nowa wersja",
+  update_download: "Pobierz",
+  update_later: "Później",
+  update_current: "Aktualna wersja",
+  update_latest: "Najnowsza wersja",
+  update_changelog: "Co nowego",
   help_content: {
     title: "Jak korzystać z aplikacji",
     sections: [
@@ -220,7 +231,14 @@ const LANG_EN: typeof LANG_PL = {
   about: "About",
   help_title: "Help / Instructions",
   about_title: "About / Info",
+  support_project: "Support project",
   close: "Close",
+  update_available: "New version available",
+  update_download: "Download",
+  update_later: "Later",
+  update_current: "Current version",
+  update_latest: "Latest version",
+  update_changelog: "What's new",
   help_content: {
     title: "How to use the application",
     sections: [
@@ -400,6 +418,75 @@ export default function App() {
 
   const [newRow, setNewRow] = useState({ datetime: "", hc: "", hwc: "", meter: "", comment: "" });
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Update checking state
+  interface UpdateInfo {
+  version: string;
+  url: string;
+  body: string;
+  date: string;
+  assets: { name: string; url: string; size: number }[];
+}
+
+const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+const [showUpdate, setShowUpdate] = useState(false);
+const [updateDismissed, setUpdateDismissed] = useState(false);
+const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+// update checking
+useEffect(() => {
+  const checkForUpdates = async () => {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+      if (!res.ok) return;
+      const data = await res.json();
+      
+      const latestVersion = data.tag_name.replace(/^v/, "");
+      
+      // Porównaj wersje
+      const current = APP_VERSION.split(".").map(Number);
+      const latest = latestVersion.split(".").map(Number);
+      
+      let isNewer = false;
+      for (let i = 0; i < 3; i++) {
+        if ((latest[i] || 0) > (current[i] || 0)) { isNewer = true; break; }
+        if ((latest[i] || 0) < (current[i] || 0)) break;
+      }
+      
+      if (isNewer) {
+        setUpdateInfo({
+          version: latestVersion,
+          url: data.html_url,
+          body: data.body || "",
+          date: new Date(data.published_at).toLocaleDateString(),
+          assets: (data.assets || []).map((a: any) => ({
+            name: a.name,
+            url: a.browser_download_url,
+            size: a.size,
+          })),
+        });
+        
+        // Pokaż baner jeśli nie odrzucono tej wersji wcześniej
+        const dismissed = localStorage.getItem("gme_dismissed_version");
+        if (dismissed !== latestVersion) {
+          setShowUpdate(true);
+        }
+      }
+    } catch {
+      // Brak internetu lub błąd — cicho ignoruj
+    }
+  };
+  
+  checkForUpdates();
+}, []);
+
+const dismissUpdate = () => {
+  setShowUpdate(false);
+  setUpdateDismissed(true);
+  if (updateInfo) {
+    localStorage.setItem("gme_dismissed_version", updateInfo.version);
+  }
+};
 
   // Save preferences to localStorage
   useEffect(() => { localStorage.setItem(LS_LANG, lang); }, [lang]);
@@ -722,6 +809,49 @@ const handleFile = useCallback((file: File) => {
         </div>
       )}
 
+      {/* ── Update Banner ──
+      {showUpdate && updateInfo && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] ${theme === "dark" ? "bg-gradient-to-r from-amber-900/95 to-orange-900/95 border-amber-600/50" : "bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300"} border backdrop-blur-sm px-5 py-3 rounded-xl shadow-2xl max-w-lg w-full animate-slide-in`}>
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Download className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`text-sm font-semibold ${theme === "dark" ? "text-amber-200" : "text-amber-800"}`}>
+                  🎉 {t.update_available}!
+                </span>
+              </div>
+              <div className={`text-xs ${theme === "dark" ? "text-amber-300/70" : "text-amber-600"} mb-2`}>
+                {t.update_current}: v{APP_VERSION} → {t.update_latest}: v{updateInfo.version} ({updateInfo.date})
+              </div>
+              {updateInfo.body && (
+                <div className={`text-xs ${theme === "dark" ? "text-amber-200/60" : "text-amber-700/70"} mb-2 line-clamp-2`}>
+                  {updateInfo.body.split("\n")[0]}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <a href={updateInfo.url} target="_blank" rel="noopener noreferrer"
+                  className="bg-amber-500 hover:bg-amber-400 text-white px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition-colors">
+                  <Download className="w-3 h-3" /> {t.update_download}
+                </a>
+                {updateInfo.assets.length > 0 && (
+                  <button onClick={() => setShowUpdate(false)} className={`${theme === "dark" ? "text-amber-300/70 hover:text-amber-200" : "text-amber-600 hover:text-amber-800"} px-2 py-1.5 rounded-lg text-xs transition-colors`}>
+                    {t.update_changelog} →
+                  </button>
+                )}
+                <button onClick={dismissUpdate} className={`${theme === "dark" ? "text-amber-300/50 hover:text-amber-200" : "text-amber-500 hover:text-amber-700"} px-2 py-1.5 rounded-lg text-xs transition-colors`}>
+                  {t.update_later}
+                </button>
+              </div>
+            </div>
+            <button onClick={dismissUpdate} className={`${theme === "dark" ? "text-amber-400/50 hover:text-amber-300" : "text-amber-400 hover:text-amber-600"} transition-colors`}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )} */}
+
       {/* ── Help Modal ── */}
       {showHelp && (
         <div className={`fixed inset-0 z-50 ${c.modalOverlay} flex items-center justify-center p-4`} onClick={() => setShowHelp(false)}>
@@ -796,7 +926,20 @@ const handleFile = useCallback((file: File) => {
                     <span className="font-medium">2026-03-05</span>
                   </div>
                 </div>
-
+                <div className="flex items-start gap-3">
+                  <Download className={`w-4 h-4 mt-0.5 ${c.textMuted} flex-shrink-0`} />
+                  <div>
+                    <span className={c.textMuted}>{t.update_current}: </span>
+                    <span className="font-medium">v{APP_VERSION}</span>
+                    {updateInfo ? (
+                      <a href={updateInfo.url} target="_blank" rel="noopener noreferrer" className={`ml-2 text-xs ${c.link} underline inline-flex items-center gap-1`}>
+                        🎉 v{updateInfo.version} {t.update_available}! <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : updateDismissed ? null : (
+                      <span className={`ml-2 text-xs ${c.textMuted}`}>✅ {lang === "pl" ? "Masz najnowszą wersję" : "You have the latest version"}</span>
+                    )}
+                  </div>
+                </div>
                 <div className="flex items-start gap-3">
                   <Github className={`w-4 h-4 mt-0.5 ${c.textMuted} flex-shrink-0`} />
                   <div>
@@ -855,6 +998,44 @@ const handleFile = useCallback((file: File) => {
                     <a href="https://github.com/marcin77/gas-meter-estimation/issues" className={`${c.link} underline`}>GitHub</a>
                   </div>
                 </div>
+                <div className={`border-t ${c.divider}`} />
+
+                <div className="flex items-start gap-3">
+                  <span className={`text-base mt-0.5 flex-shrink-0`}>☕</span>
+                  <div>
+                    <span className={c.textMuted}>{t.support_project}:</span>
+                    <div className="mt-1 space-y-1">
+                      <div className="flex flex-wrap gap-3">  {/* ← dodaj flex i gap */}
+                        {/* Buy Me a Coffee - żółty */}
+                        <a href="https://buymeacoffee.com/marcin77" target="_blank" rel="noopener noreferrer" 
+                          className="hover:underline inline-flex items-center gap-1 text-yellow-400 hover:text-yellow-300">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20.216 6.415l-.132-.666c-.119-.598-.388-1.163-1.001-1.379-.197-.069-.42-.098-.57-.241-.152-.143-.196-.366-.231-.572-.065-.378-.125-.756-.192-1.133-.057-.325-.102-.69-.25-.987-.195-.4-.597-.634-.996-.788a5.723 5.723 0 00-.626-.194c-1-.263-2.05-.36-3.077-.416a25.834 25.834 0 00-3.7.062c-.915.083-1.88.184-2.75.5-.318.116-.646.256-.888.501-.297.302-.393.77-.177 1.146.154.267.415.456.692.58.36.162.737.284 1.123.366 1.075.238 2.189.331 3.287.37 1.218.05 2.437.01 3.65-.118.299-.033.598-.073.896-.119.352-.054.578-.513.474-.834-.124-.383-.457-.531-.834-.473-.466.074-.96.108-1.382.146-1.177.08-2.358.082-3.536.006a22.228 22.228 0 01-1.157-.107c-.086-.01-.18-.025-.258-.036-.243-.036-.484-.08-.724-.13-.111-.027-.111-.185 0-.212h.005c.277-.06.557-.108.838-.147h.002c.131-.009.263-.032.394-.048a25.076 25.076 0 013.426-.12c.674.019 1.347.067 2.017.144l.228.031c.267.04.533.088.798.145.392.085.895.113 1.07.542.055.137.08.288.111.431l.319 1.484a.237.237 0 01-.199.284h-.003c-.037.006-.075.01-.112.015a36.704 36.704 0 01-4.743.295 37.059 37.059 0 01-4.699-.304c-.14-.017-.293-.042-.417-.06-.326-.048-.649-.108-.973-.161-.393-.065-.768-.032-1.123.161-.29.16-.502.451-.63.778-.156.397-.182.828-.166 1.25a4.233 4.233 0 00.676 2.088c.258.386.6.706.992.958.423.272.907.427 1.397.497a24.29 24.29 0 002.186.164 42.077 42.077 0 004.324-.105c.37-.027.738-.066 1.106-.113.193-.025.392-.07.575-.074.202-.004.357.143.378.342.012.127.004.253-.015.378a2.879 2.879 0 01-.573 1.327c-.41.5-.96.84-1.576 1.005-.579.155-1.182.191-1.782.182-.603-.01-1.205-.066-1.803-.153a12.87 12.87 0 01-.888-.17c-.345-.075-.636-.247-.938-.398a.304.304 0 00-.168-.048.3.3 0 00-.29.215c-.044.16.009.326.12.44.14.145.327.243.523.315.7.259 1.435.422 2.186.496.776.077 1.555.088 2.334.023.778-.065 1.547-.218 2.272-.504a4.47 4.47 0 001.674-1.1c.453-.498.751-1.1.905-1.748.076-.322.109-.653.107-.983 0-.135-.007-.27-.02-.404-.014-.14-.04-.279-.077-.414a1.403 1.403 0 00-.565-.787c-.248-.168-.544-.262-.837-.324-.34-.072-.687-.115-1.034-.147z"/>
+                          </svg>
+                          BMC
+                        </a> 
+
+                        {/* Ko-fi - niebieski */}
+                        <a href="https://ko-fi.com/marcin77" target="_blank" rel="noopener noreferrer" 
+                          className="hover:underline inline-flex items-center gap-1 text-sky-400 hover:text-sky-300">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/>
+                          </svg>
+                          Ko-fi
+                        </a> 
+
+                        {/* PayPal - niebieski */}
+                        <a href="https://paypal.me/MartinSnow" target="_blank" rel="noopener noreferrer" 
+                          className="hover:underline inline-flex items-center gap-1 text-blue-400 hover:text-blue-300">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 00-.607-.541c1.652 4.928-2.053 7.444-6.96 7.444H11.21c-.63 0-1.168.457-1.268 1.082l-.857 5.442-.244 1.544a.636.636 0 00.629.74h4.44c.524 0 .968-.383 1.05-.9l.043-.22.837-5.308.054-.294a1.064 1.064 0 011.05-.901h.662c4.298 0 7.664-1.747 8.647-6.797.41-2.11.198-3.871-.886-5.091z"/>
+                          </svg>
+                          PayPal
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>             
               </div>
             </div>
             <div className={`px-6 py-3 border-t ${c.divider} flex justify-end`}>
@@ -863,18 +1044,165 @@ const handleFile = useCallback((file: File) => {
           </div>
         </div>
       )}
+        {/* ── Update Modal ── */}
+        {showUpdateModal && updateInfo && (
+          <div className={`fixed inset-0 z-50 ${c.modalOverlay} flex items-center justify-center p-4`} onClick={() => setShowUpdateModal(false)}>
+            <div className={`${c.modalBg} border rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden`} onClick={(e) => e.stopPropagation()}>
+              
+              {/* Header */}
+              <div className={`flex items-center justify-between px-6 py-4 border-b ${c.divider}`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-600 rounded-xl flex items-center justify-center">
+                    <Download className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                      🎉 {t.update_available}!
+                      <span className={`text-xs px-2 py-1 rounded-full ${c.badgeGreen}`}>v{updateInfo.version}</span>
+                    </h2>
+                    <p className={`text-xs ${c.textMuted}`}>
+                      {new Date(updateInfo.date).toLocaleDateString(lang === 'pl' ? 'pl-PL' : 'en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setShowUpdateModal(false)} className={`${c.btn} p-2 rounded-lg transition-colors`}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
+              {/* Body */}
+              <div className="px-6 py-5 max-h-[60vh] overflow-y-auto">
+                {/* Wersje */}
+                <div className={`flex items-center justify-between p-4 ${c.cardDark} border ${c.divider} rounded-xl mb-4`}>
+                  <div className="text-center">
+                    <div className={`text-xs ${c.textMuted} mb-1`}>{t.update_current}</div>
+                    <div className={`text-2xl font-bold ${c.textLight}`}>v{APP_VERSION}</div>
+                  </div>
+                  <div className="text-2xl text-amber-400">→</div>
+                  <div className="text-center">
+                    <div className={`text-xs ${c.textMuted} mb-1`}>{t.update_latest}</div>
+                    <div className="text-2xl font-bold text-amber-400">v{updateInfo.version}</div>
+                  </div>
+                </div>
+
+                {/* Changelog */}
+                {updateInfo.body && (
+                  <div className="mb-4">
+                    <h3 className={`text-sm font-semibold ${c.textLight} mb-2 flex items-center gap-2`}>
+                      <span className="w-1 h-4 bg-amber-500 rounded-full"></span>
+                      {t.update_changelog}
+                    </h3>
+                    <div className={`text-sm ${c.textMuted} whitespace-pre-wrap leading-relaxed p-3 ${c.cardDark} border ${c.divider} rounded-xl`}>
+                      {updateInfo.body}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pliki do pobrania */}
+                {updateInfo.assets.length > 0 && (
+                  <div>
+                    <h3 className={`text-sm font-semibold ${c.textLight} mb-2 flex items-center gap-2`}>
+                      <span className="w-1 h-4 bg-amber-500 rounded-full"></span>
+                      {t.update_download}
+                    </h3>
+                    <div className="space-y-2">
+                      {updateInfo.assets.map((asset, idx) => (
+                        <a
+                          key={idx}
+                          href={asset.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`flex items-center justify-between p-3 ${c.cardDark} border ${c.divider} rounded-xl hover:border-amber-500/30 transition-colors group`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-lg ${asset.name.endsWith('.exe') ? 'bg-blue-500/20' : asset.name.endsWith('.AppImage') ? 'bg-purple-500/20' : 'bg-gray-500/20'} flex items-center justify-center`}>
+                              {asset.name.endsWith('.exe') && <span className="text-blue-400 text-xs font-bold">EXE</span>}
+                              {asset.name.endsWith('.AppImage') && <span className="text-purple-400 text-xs font-bold">IMG</span>}
+                              {asset.name.endsWith('.dmg') && <span className="text-gray-400 text-xs font-bold">DMG</span>}
+                            </div>
+                            <div>
+                              <div className={`text-sm font-medium ${c.textLight}`}>{asset.name}</div>
+                              <div className={`text-xs ${c.textMuted}`}>{(asset.size / 1024 / 1024).toFixed(1)} MB</div>
+                            </div>
+                          </div>
+                          <Download className="w-4 h-4 text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+      {/* Footer */}
+      <div className={`px-6 py-3 border-t ${c.divider} flex justify-between items-center`}>
+        <button
+          onClick={dismissUpdate}
+          className={`${c.btn} px-4 py-2 rounded-lg text-sm font-medium`}
+        >
+          {t.update_later}
+        </button>
+        <a
+          href={updateInfo.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-amber-500 hover:bg-amber-400 text-white px-6 py-2 rounded-lg text-sm font-medium inline-flex items-center gap-2 transition-colors"
+        >
+          <ExternalLink className="w-4 h-4" />
+          {t.update_download}
+        </a>
+      </div>
+    </div>
+  </div>
+)}
       {/* ── Header ── */}
       <header className={`${c.header} border-b px-6 py-4`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* App Icon */}
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center shadow-md">
-              <svg viewBox="0 0 48 48" className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M24 4C18 4 14 8 14 14V18H12C10.9 18 10 18.9 10 20V42C10 43.1 10.9 44 12 44H36C37.1 44 38 43.1 38 42V20C38 18.9 37.1 18 36 18H34V14C34 8 30 4 24 4Z" strokeLinejoin="round"/>
-                <path d="M18 18V14C18 10.7 20.7 8 24 8C27.3 8 30 10.7 30 14V18" strokeLinejoin="round"/>
-                <circle cx="24" cy="30" r="3"/>
-                <line x1="24" y1="33" x2="24" y2="37"/>
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center shadow-md p-1">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 1024 1024"
+                fill="currentColor" 
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-6 h-6 text-white"
+              >
+                {/* Poprawiona transformacja - usunąłem minus */}
+                <g transform="scale(0.12) scale(1, -1) translate(-500, -9200)">
+                  <path
+                    d="M4812 9249c-502-33-1031-178-1487-406-468-234-893-557-1221-925-357-402-591-772-777-1234-202-498-292-913-317-1459-12-267-3-3302 11-3483 19-263 104-439 279-582 79-63 199-127 292-154 32-9 102-21 155-26 124-12 3100-12 3583 0 595 15 872 56 1280 191 271 90 591 242 815 388 105 68 358 261 430 327 11 11 58 53 104 94 112 100 381 390 416 449 6 9 49 69 96 131 266 356 486 824 623 1325 91 331 132 626 142 1030 10 377-16 684-86 1038-31 154-43 200-108 408-129 417-401 940-663 1273-181 230-433 496-604 638-104 86-319 250-385 292-185 121-430 256-600 331-58 25-119 52-135 60-17 7-89 34-160 60-545 194-1110 273-1683 234z m658-1293c353-43 667-140 980-303 731-381 1267-1046 1465-1818 86-336 113-672 80-1005-30-316-86-544-214-870l-41-105-2616 0c-2440 0-2616 2-2625 17-15 26-83 203-118 305-211 618-195 1334 46 1956 37 96 163 355 209 429 213 346 480 636 804 874 120 89 404 252 511 294 29 12 72 30 97 41 197 90 547 171 857 199 123 12 413 4 565-14z m735-5223c73-26 158-113 179-183 34-113 7-220-74-301-84-84-12-79-1196-79-1011 0-1044 1-1088 20-25 10-65 37-90 60-132 121-115 348 33 446 84 55 34 53 1151 54 961 0 1039-1 1085-17z"
+                    fill="currentColor"
+                  />
+                  <path
+                    d="M5035 7327c-44-44-47-77-43-397 3-236 5-258 23-290 30-50 89-70 147-50 22 8 51 28 62 43 20 27 21 42 24 330 3 274 2 305-14 335-23 42-60 62-120 62-39 0-51-5-79-33z"
+                    fill="currentColor"
+                  />
+                  <path
+                    d="M3781 6923c-64-31-89-110-56-173 37-72 289-441 316-464 57-48 162-24 196 44 16 31 17 85 2 113-37 70-307 461-330 477-33 24-82 25-128 3z"
+                    fill="currentColor"
+                  />
+                  <path
+                    d="M6311 6893c-26-27-84-106-129-178-46-71-108-166-139-210-50-72-55-83-50-121 11-102 128-160 207-104 30 21 260 361 313 463 28 52 29 60 18 96-6 22-27 53-46 70-29 25-44 31-82 31-43 0-51-4-92-47z"
+                    fill="currentColor"
+                  />
+                  <path
+                    d="M6483 5894c-158-81-407-207-553-280-146-74-335-170-420-214-132-68-156-77-170-66-38 33-114 51-221 51-101 0-108-1-180-37-116-58-189-140-229-259-18-53-21-81-18-169 3-96 6-112 37-175 150-304 571-337 755-60 40 60 76 152 76 195 0 38 9 45 424 344 44 32 110 82 146 111 36 29 99 76 140 105 41 30 191 141 333 248 275 208 286 220 264 285-9 28-59 67-84 67-7 0-142-66-300-146z"
+                    fill="currentColor"
+                  />
+                  <path
+                    d="M2968 5968c-67-39-88-126-45-188 14-21 86-71 212-148 310-189 312-189 375-157 47 24 70 62 70 115 0 79-19 95-332 284-98 59-192 109-210 112-23 3-45-2-70-18z"
+                    fill="currentColor"
+                  />
+                  <path
+                    d="M7164 5976c-28-12-217-130-401-250-78-50-103-84-103-140 0-42 43-96 91-116 47-20 90-4 231 84 67 43 166 104 218 135 53 33 105 73 118 91 42 62 23 149-41 189-39 24-69 26-113 7z"
+                    fill="currentColor"
+                  />
+                </g>
               </svg>
             </div>
             <div>
@@ -898,6 +1226,22 @@ const handleFile = useCallback((file: File) => {
             <button onClick={() => setShowAbout(true)} className={`${c.btn} p-2 rounded-lg transition-colors`} title={t.about}>
               <Info className="w-4 h-4" />
             </button>
+            {/* Divider */}
+            <div className={`w-px h-6 ${theme === "dark" ? "bg-gray-700" : "bg-gray-300"}`} />
+
+            {/* Update button - tylko jeśli dostępna aktualizacja */}
+            {updateInfo && (
+              <button 
+                onClick={() => setShowUpdateModal(true)}
+                className={`${c.btn} p-2 rounded-lg transition-colors relative group`}
+                title={`${t.update_available}! v${APP_VERSION} → v${updateInfo.version}`}
+              >
+                <Download className="w-4 h-4 text-red-500" />
+                {/* Kropka powiadomienia */}
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></span>
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+              </button>
+            )}
             {/* Divider */}
             <div className={`w-px h-6 ${theme === "dark" ? "bg-gray-700" : "bg-gray-300"}`} />
             {/* Theme toggle */}
@@ -1252,7 +1596,14 @@ const handleFile = useCallback((file: File) => {
       {/* ── Footer ── */}
       <footer className={`${c.header} border-t px-6 py-3 mt-8`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between text-xs">
-          <span className={c.textMuted}>Gas Meter Estimation v1.0.1 • MIT License</span>
+          <span className={c.textMuted}>
+            Gas Meter Estimation v{APP_VERSION} • MIT License
+            {updateInfo && (
+              <a href={updateInfo.url} target="_blank" rel="noopener noreferrer" className="ml-2 text-amber-400 hover:text-amber-300 underline">
+                🎉 v{updateInfo.version}
+              </a>
+            )}
+          </span>
           <div className="flex items-center gap-3">
             <button onClick={() => setShowHelp(true)} className={`${c.textMuted} hover:${c.textLight} transition-colors flex items-center gap-1`}>
               <HelpCircle className="w-3 h-3" /> {t.help}
@@ -1260,6 +1611,25 @@ const handleFile = useCallback((file: File) => {
             <button onClick={() => setShowAbout(true)} className={`${c.textMuted} hover:${c.textLight} transition-colors flex items-center gap-1`}>
               <Info className="w-3 h-3" /> {t.about}
             </button>
+            <span className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-300"} w-px h-3`} />
+            <span className={c.textMuted}>☕ {t.support_project}:</span>
+            {/* Buy Me a Coffee - żółty */}
+            <a href="https://buymeacoffee.com/marcin77" target="_blank" rel="noopener noreferrer" className="hover:underline inline-flex items-center gap-1 text-yellow-400 hover:text-yellow-300">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M20.216 6.415l-.132-.666c-.119-.598-.388-1.163-1.001-1.379-.197-.069-.42-.098-.57-.241-.152-.143-.196-.366-.231-.572-.065-.378-.125-.756-.192-1.133-.057-.325-.102-.69-.25-.987-.195-.4-.597-.634-.996-.788a5.723 5.723 0 00-.626-.194c-1-.263-2.05-.36-3.077-.416a25.834 25.834 0 00-3.7.062c-.915.083-1.88.184-2.75.5-.318.116-.646.256-.888.501-.297.302-.393.77-.177 1.146.154.267.415.456.692.58.36.162.737.284 1.123.366 1.075.238 2.189.331 3.287.37 1.218.05 2.437.01 3.65-.118.299-.033.598-.073.896-.119.352-.054.578-.513.474-.834-.124-.383-.457-.531-.834-.473-.466.074-.96.108-1.382.146-1.177.08-2.358.082-3.536.006a22.228 22.228 0 01-1.157-.107c-.086-.01-.18-.025-.258-.036-.243-.036-.484-.08-.724-.13-.111-.027-.111-.185 0-.212h.005c.277-.06.557-.108.838-.147h.002c.131-.009.263-.032.394-.048a25.076 25.076 0 013.426-.12c.674.019 1.347.067 2.017.144l.228.031c.267.04.533.088.798.145.392.085.895.113 1.07.542.055.137.08.288.111.431l.319 1.484a.237.237 0 01-.199.284h-.003c-.037.006-.075.01-.112.015a36.704 36.704 0 01-4.743.295 37.059 37.059 0 01-4.699-.304c-.14-.017-.293-.042-.417-.06-.326-.048-.649-.108-.973-.161-.393-.065-.768-.032-1.123.161-.29.16-.502.451-.63.778-.156.397-.182.828-.166 1.25a4.233 4.233 0 00.676 2.088c.258.386.6.706.992.958.423.272.907.427 1.397.497a24.29 24.29 0 002.186.164 42.077 42.077 0 004.324-.105c.37-.027.738-.066 1.106-.113.193-.025.392-.07.575-.074.202-.004.357.143.378.342.012.127.004.253-.015.378a2.879 2.879 0 01-.573 1.327c-.41.5-.96.84-1.576 1.005-.579.155-1.182.191-1.782.182-.603-.01-1.205-.066-1.803-.153a12.87 12.87 0 01-.888-.17c-.345-.075-.636-.247-.938-.398a.304.304 0 00-.168-.048.3.3 0 00-.29.215c-.044.16.009.326.12.44.14.145.327.243.523.315.7.259 1.435.422 2.186.496.776.077 1.555.088 2.334.023.778-.065 1.547-.218 2.272-.504a4.47 4.47 0 001.674-1.1c.453-.498.751-1.1.905-1.748.076-.322.109-.653.107-.983 0-.135-.007-.27-.02-.404-.014-.14-.04-.279-.077-.414a1.403 1.403 0 00-.565-.787c-.248-.168-.544-.262-.837-.324-.34-.072-.687-.115-1.034-.147z"/></svg>
+              BMC
+            </a>
+
+            {/* Ko-fi - niebieski */}
+            <a href="https://ko-fi.com/marcin77" target="_blank" rel="noopener noreferrer" className="hover:underline inline-flex items-center gap-1 text-sky-400 hover:text-sky-300">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/></svg>
+              Ko-fi
+            </a>
+
+            {/* PayPal - niebieski */}
+            <a href="https://paypal.me/MartinSnow" target="_blank" rel="noopener noreferrer" className="hover:underline inline-flex items-center gap-1 text-blue-400 hover:text-blue-300">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 00-.607-.541c1.652 4.928-2.053 7.444-6.96 7.444H11.21c-.63 0-1.168.457-1.268 1.082l-.857 5.442-.244 1.544a.636.636 0 00.629.74h4.44c.524 0 .968-.383 1.05-.9l.043-.22.837-5.308.054-.294a1.064 1.064 0 011.05-.901h.662c4.298 0 7.664-1.747 8.647-6.797.41-2.11.198-3.871-.886-5.091z"/></svg>
+              PayPal
+            </a>
           </div>
         </div>
       </footer>

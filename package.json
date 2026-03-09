@@ -1,6 +1,6 @@
 {
   "name": "gas-meter-estimation",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Desktop & Web application for gas meter reading estimation using Multiple Linear Regression.",
@@ -16,10 +16,10 @@
     "electron": "electron main.js",
     "build:appimage": "electron-builder --linux AppImage",
     "dist": "electron-builder",
-    "dist:linux": "electron-builder --linux", 
-    "dist:win": "electron-builder --win",      
-    "dist:mac": "electron-builder --mac", 
-    "dist:all": "electron-builder -mwl" 
+    "dist:linux": "electron-builder --linux",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:all": "electron-builder -mwl"
   },
   "dependencies": {
     "@types/papaparse": "^5.5.2",
@@ -58,17 +58,25 @@
       "preload.cjs",
       "assets/**/*"
     ],
-      "mac": {
-      "target": ["dmg", "zip"],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "category": "public.app-category.utilities",
       "icon": "assets/icons/icon.icns"
     },
     "win": {
-      "target": ["nsis", "portable"], 
-      "icon": "assets/icons/icon.ico" 
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icons/icon.ico"
     },
     "linux": {
-      "target": ["AppImage"],
+      "target": [
+        "AppImage"
+      ],
       "category": "Utility",
       "icon": "assets/icons/icon.png"
     }
