@@ -1,6 +1,6 @@
 {
   "name": "gas-meter-estimation",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "Desktop & Web application for gas meter reading estimation using Multiple Linear Regression.",
@@ -10,7 +10,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --base=./",
     "preview": "vite preview",
     "start": "electron .",
     "electron": "electron main.js",
@@ -44,6 +44,7 @@
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
+    "vite-plugin-pwa": "^1.2.0",
     "vite-plugin-singlefile": "2.3.0"
   },
   "build": {

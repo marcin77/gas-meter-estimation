@@ -1,5 +1,6 @@
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const GITHUB_REPO = "marcin77/gas-meter-estimation";
+declare const __BUILD_DATE__: string;
 
 /* ────────── React ────────── */
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
@@ -34,6 +35,7 @@ import {
   ExternalLink,
   Mail,
   Github,
+  Home,
 } from "lucide-react";
 import { fitLinearRegression, ModelResult } from "./linearRegression";
 
@@ -124,6 +126,24 @@ const LANG_PL = {
   update_current: "Aktualna wersja",
   update_latest: "Najnowsza wersja",
   update_changelog: "Co nowego",
+  tooltip_r2_train: "R² (R-kwadrat) na danych treningowych pokazuje, jak dobrze model dopasował się do danych, na których był trenowany. Wartość 100 oznacza idealne dopasowanie.",
+  tooltip_r2_test: "R² na danych testowych pokazuje, jak model radzi sobie z nowymi danymi. To kluczowa metryka oceny modelu. Im wyższa wartość, tym lepsza generalizacja.",
+  tooltip_mae: "MAE (Mean Absolute Error) to średnia wartość błędu bezwzględnego - średnia różnica między przewidywaniami a rzeczywistymi wartościami. Mniejszy znaczy lepszy.",
+  tooltip_rmse: "RMSE (Root Mean Square Error) to pierwiastek średniego błędu kwadratowego - bardziej karze duże błędy niż MAE. Jest bardziej wrażliwy na wartości odstające. Im mniejszy, tym lepszy.",
+  tab_homeassistant: "Home Assistant",
+  ha_title: "Generator sensora Home Assistant",
+  ha_desc: "Wygeneruj gotowy kod YAML sensora dla Home Assistant na podstawie wytrenowanego modelu.",
+  ha_sensor_hc: "Sensor HC (Heat Counter)",
+  ha_sensor_hwc: "Sensor HWC (Hot Water Counter)",
+  ha_sensor_name: "Nazwa sensora",
+  ha_generate: "Generuj YAML",
+  ha_copy: "Kopiuj YAML",
+  ha_copied: "Skopiowano!",
+  ha_placeholder_hc: "sensor.boiler_prenergysumhc1",
+  ha_placeholder_hwc: "sensor.boiler_prenergysumhwc1",
+  ha_note: "Wklej ten kod do pliku configuration.yaml w sekcji template:",
+  ha_no_model: "Najpierw wytrenuj model w zakładce Dane",
+  ha_placeholder_name: "Szacowane zużycie gazu",
   help_content: {
     title: "Jak korzystać z aplikacji",
     sections: [
@@ -239,6 +259,24 @@ const LANG_EN: typeof LANG_PL = {
   update_current: "Current version",
   update_latest: "Latest version",
   update_changelog: "What's new",
+  tooltip_r2_train: "R² (R-square) on training data shows how well the model fits the data it was trained on. A value of 1 indicates a perfect fit.",
+  tooltip_r2_test: "R² on test data shows how the model performs on new data. This is a key metric for evaluating the model.",
+  tooltip_mae: "Mean Absolute Error - average difference between predictions and actual values. Lower is better.",
+  tooltip_rmse: "Root Mean Squared Error - more penalizing of large errors. Lower is better.",
+  tab_homeassistant: "Home Assistant",
+  ha_title: "Home Assistant Sensor Generator",
+  ha_desc: "Generate ready-to-use YAML sensor code for Home Assistant based on the trained model.",
+  ha_sensor_hc: "HC Sensor (Heat Counter)",
+  ha_sensor_hwc: "HWC Sensor (Hot Water Counter)",
+  ha_sensor_name: "Sensor name",
+  ha_generate: "Generate YAML",
+  ha_copy: "Copy YAML",
+  ha_copied: "Copied!",
+  ha_placeholder_hc: "sensor.boiler_prenergysumhc1",
+  ha_placeholder_hwc: "sensor.boiler_prenergysumhwc1",
+  ha_placeholder_name: "Estimated gas consumption",
+  ha_note: "Paste this code into your configuration.yaml under template:",
+  ha_no_model: "Train a model first in the Data tab",
   help_content: {
     title: "How to use the application",
     sections: [
@@ -289,7 +327,7 @@ interface DataRow {
   FIELD_COMMENT: string;
 }
 
-type TabKey = "data" | "results" | "estimation" | "predict";
+type TabKey = "data" | "results" | "estimation" | "predict" | "homeassistant";
 type Lang = "pl" | "en";
 type Theme = "dark" | "light";
 
@@ -397,6 +435,35 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 20;
+  const [haHcSensor, setHaHcSensor] = useState("sensor.boiler_prenergysumhc1");
+  const [haHwcSensor, setHaHwcSensor] = useState("sensor.boiler_prenergysumhwc1");
+  const [haSensorName, setHaSensorName] = useState("");
+  const [haYaml, setHaYaml] = useState("");
+  const [haCopied, setHaCopied] = useState(false);
+
+  const CornerInfoIcon = ({ field, description }: { field: string; description: string }) => (
+  <div className="relative">
+    <button
+      onMouseEnter={() => setActiveInfo(field)}
+      onMouseLeave={() => setActiveInfo(null)}
+      onClick={() => setActiveInfo(activeInfo === field ? null : field)}
+      className="absolute top-2 right-2 focus:outline-none"
+    >
+      <Info className="w-4 h-4 text-gray-400 hover:text-amber-400 transition-colors" />
+    </button>
+    
+    {/* Tooltip */}
+    {activeInfo === field && (
+      <div className="absolute top-8 right-0 w-64 p-3 rounded-lg shadow-xl z-50 text-xs
+                    bg-gray-900 border border-gray-700 text-gray-200">
+        <div className="absolute -top-2 right-4 w-0 h-0 
+                      border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent 
+                      border-b-gray-900"></div>
+        {description}
+      </div>
+    )}
+  </div>
+);
 
   // Load saved preferences from localStorage
   const [lang, setLang] = useState<Lang>(() => {
@@ -418,6 +485,7 @@ export default function App() {
 
   const [newRow, setNewRow] = useState({ datetime: "", hc: "", hwc: "", meter: "", comment: "" });
   const [showAddForm, setShowAddForm] = useState(false);
+  const [activeInfo, setActiveInfo] = useState<string | null>(null);
 
   // Update checking state
   interface UpdateInfo {
@@ -429,9 +497,35 @@ export default function App() {
 }
 
 const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-const [showUpdate, setShowUpdate] = useState(false);
 const [updateDismissed, setUpdateDismissed] = useState(false);
 const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+const generateHaYaml = () => {
+  if (!model) return;
+  const name = haSensorName || t.ha_placeholder_name;
+  const yaml = `template:
+  - sensor:
+      - name: "${name}"
+        device_class: gas
+        state_class: total_increasing
+        unit_of_measurement: "m³"
+        state: >
+          {% set HC = states('${haHcSensor}') | int %}
+          {% set HWC = states('${haHwcSensor}') | int %}
+          {% set INTERCEPT = ${model.intercept.toFixed(16)} %}
+          {% set COEF_1 = ${model.coefficients[0].toExponential(16)} %}
+          {% set COEF_2 = ${model.coefficients[1].toExponential(16)} %}
+          {{ (INTERCEPT + HC * COEF_1 + HWC * COEF_2) | round(3) }}`;
+  setHaYaml(yaml);
+};
+
+const copyHaYaml = () => {
+  navigator.clipboard.writeText(haYaml).then(() => {
+    setHaCopied(true);
+    setTimeout(() => setHaCopied(false), 2000);
+  });
+};
+
 
 // update checking
 useEffect(() => {
@@ -458,7 +552,7 @@ useEffect(() => {
           version: latestVersion,
           url: data.html_url,
           body: data.body || "",
-          date: new Date(data.published_at).toLocaleDateString(),
+          date: data.published_at?.split('T')[0] || '',
           assets: (data.assets || []).map((a: any) => ({
             name: a.name,
             url: a.browser_download_url,
@@ -469,7 +563,7 @@ useEffect(() => {
         // Pokaż baner jeśli nie odrzucono tej wersji wcześniej
         const dismissed = localStorage.getItem("gme_dismissed_version");
         if (dismissed !== latestVersion) {
-          setShowUpdate(true);
+          setShowUpdateModal(true);
         }
       }
     } catch {
@@ -481,12 +575,13 @@ useEffect(() => {
 }, []);
 
 const dismissUpdate = () => {
-  setShowUpdate(false);
+  setShowUpdateModal(false);
   setUpdateDismissed(true);
   if (updateInfo) {
     localStorage.setItem("gme_dismissed_version", updateInfo.version);
   }
 };
+
 
   // Save preferences to localStorage
   useEffect(() => { localStorage.setItem(LS_LANG, lang); }, [lang]);
@@ -809,49 +904,6 @@ const handleFile = useCallback((file: File) => {
         </div>
       )}
 
-      {/* ── Update Banner ──
-      {showUpdate && updateInfo && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] ${theme === "dark" ? "bg-gradient-to-r from-amber-900/95 to-orange-900/95 border-amber-600/50" : "bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300"} border backdrop-blur-sm px-5 py-3 rounded-xl shadow-2xl max-w-lg w-full animate-slide-in`}>
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Download className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`text-sm font-semibold ${theme === "dark" ? "text-amber-200" : "text-amber-800"}`}>
-                  🎉 {t.update_available}!
-                </span>
-              </div>
-              <div className={`text-xs ${theme === "dark" ? "text-amber-300/70" : "text-amber-600"} mb-2`}>
-                {t.update_current}: v{APP_VERSION} → {t.update_latest}: v{updateInfo.version} ({updateInfo.date})
-              </div>
-              {updateInfo.body && (
-                <div className={`text-xs ${theme === "dark" ? "text-amber-200/60" : "text-amber-700/70"} mb-2 line-clamp-2`}>
-                  {updateInfo.body.split("\n")[0]}
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <a href={updateInfo.url} target="_blank" rel="noopener noreferrer"
-                  className="bg-amber-500 hover:bg-amber-400 text-white px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 transition-colors">
-                  <Download className="w-3 h-3" /> {t.update_download}
-                </a>
-                {updateInfo.assets.length > 0 && (
-                  <button onClick={() => setShowUpdate(false)} className={`${theme === "dark" ? "text-amber-300/70 hover:text-amber-200" : "text-amber-600 hover:text-amber-800"} px-2 py-1.5 rounded-lg text-xs transition-colors`}>
-                    {t.update_changelog} →
-                  </button>
-                )}
-                <button onClick={dismissUpdate} className={`${theme === "dark" ? "text-amber-300/50 hover:text-amber-200" : "text-amber-500 hover:text-amber-700"} px-2 py-1.5 rounded-lg text-xs transition-colors`}>
-                  {t.update_later}
-                </button>
-              </div>
-            </div>
-            <button onClick={dismissUpdate} className={`${theme === "dark" ? "text-amber-400/50 hover:text-amber-300" : "text-amber-400 hover:text-amber-600"} transition-colors`}>
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )} */}
-
       {/* ── Help Modal ── */}
       {showHelp && (
         <div className={`fixed inset-0 z-50 ${c.modalOverlay} flex items-center justify-center p-4`} onClick={() => setShowHelp(false)}>
@@ -900,20 +952,53 @@ const handleFile = useCallback((file: File) => {
             </div>
             <div className="px-6 py-5 space-y-4">
               {/* App icon and name */}
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <svg viewBox="0 0 48 48" className="w-10 h-10 text-white" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M24 4C18 4 14 8 14 14V18H12C10.9 18 10 18.9 10 20V42C10 43.1 10.9 44 12 44H36C37.1 44 38 43.1 38 42V20C38 18.9 37.1 18 36 18H34V14C34 8 30 4 24 4Z" strokeLinejoin="round"/>
-                    <path d="M18 18V14C18 10.7 20.7 8 24 8C27.3 8 30 10.7 30 14V18" strokeLinejoin="round"/>
-                    <circle cx="24" cy="30" r="4"/>
-                    <line x1="24" y1="34" x2="24" y2="38"/>
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">Gas Meter Estimation</h3>
-                  <div className={`text-sm ${c.textMuted}`}>v1.0.1</div>
-                </div>
-              </div>
+<div className="flex items-center gap-4">
+  <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg p-2">
+    <svg
+      width="48"
+      height="48"
+      viewBox="0 0 1024 1024"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-12 h-12 text-white"
+    >
+      <g transform="scale(0.12) scale(1, -1) translate(-500, -9200)">
+        <path
+          d="M4812 9249c-502-33-1031-178-1487-406-468-234-893-557-1221-925-357-402-591-772-777-1234-202-498-292-913-317-1459-12-267-3-3302 11-3483 19-263 104-439 279-582 79-63 199-127 292-154 32-9 102-21 155-26 124-12 3100-12 3583 0 595 15 872 56 1280 191 271 90 591 242 815 388 105 68 358 261 430 327 11 11 58 53 104 94 112 100 381 390 416 449 6 9 49 69 96 131 266 356 486 824 623 1325 91 331 132 626 142 1030 10 377-16 684-86 1038-31 154-43 200-108 408-129 417-401 940-663 1273-181 230-433 496-604 638-104 86-319 250-385 292-185 121-430 256-600 331-58 25-119 52-135 60-17 7-89 34-160 60-545 194-1110 273-1683 234z m658-1293c353-43 667-140 980-303 731-381 1267-1046 1465-1818 86-336 113-672 80-1005-30-316-86-544-214-870l-41-105-2616 0c-2440 0-2616 2-2625 17-15 26-83 203-118 305-211 618-195 1334 46 1956 37 96 163 355 209 429 213 346 480 636 804 874 120 89 404 252 511 294 29 12 72 30 97 41 197 90 547 171 857 199 123 12 413 4 565-14z m735-5223c73-26 158-113 179-183 34-113 7-220-74-301-84-84-12-79-1196-79-1011 0-1044 1-1088 20-25 10-65 37-90 60-132 121-115 348 33 446 84 55 34 53 1151 54 961 0 1039-1 1085-17z"
+          fill="currentColor"
+        />
+        <path
+          d="M5035 7327c-44-44-47-77-43-397 3-236 5-258 23-290 30-50 89-70 147-50 22 8 51 28 62 43 20 27 21 42 24 330 3 274 2 305-14 335-23 42-60 62-120 62-39 0-51-5-79-33z"
+          fill="currentColor"
+        />
+        <path
+          d="M3781 6923c-64-31-89-110-56-173 37-72 289-441 316-464 57-48 162-24 196 44 16 31 17 85 2 113-37 70-307 461-330 477-33 24-82 25-128 3z"
+          fill="currentColor"
+        />
+        <path
+          d="M6311 6893c-26-27-84-106-129-178-46-71-108-166-139-210-50-72-55-83-50-121 11-102 128-160 207-104 30 21 260 361 313 463 28 52 29 60 18 96-6 22-27 53-46 70-29 25-44 31-82 31-43 0-51-4-92-47z"
+          fill="currentColor"
+        />
+        <path
+          d="M6483 5894c-158-81-407-207-553-280-146-74-335-170-420-214-132-68-156-77-170-66-38 33-114 51-221 51-101 0-108-1-180-37-116-58-189-140-229-259-18-53-21-81-18-169 3-96 6-112 37-175 150-304 571-337 755-60 40 60 76 152 76 195 0 38 9 45 424 344 44 32 110 82 146 111 36 29 99 76 140 105 41 30 191 141 333 248 275 208 286 220 264 285-9 28-59 67-84 67-7 0-142-66-300-146z"
+          fill="currentColor"
+        />
+        <path
+          d="M2968 5968c-67-39-88-126-45-188 14-21 86-71 212-148 310-189 312-189 375-157 47 24 70 62 70 115 0 79-19 95-332 284-98 59-192 109-210 112-23 3-45-2-70-18z"
+          fill="currentColor"
+        />
+        <path
+          d="M7164 5976c-28-12-217-130-401-250-78-50-103-84-103-140 0-42 43-96 91-116 47-20 90-4 231 84 67 43 166 104 218 135 53 33 105 73 118 91 42 62 23 149-41 189-39 24-69 26-113 7z"
+          fill="currentColor"
+        />
+      </g>
+    </svg>
+  </div>
+  <div>
+    <h3 className="text-xl font-bold">Gas Meter Estimation</h3>
+    <div className={`text-sm ${c.textMuted}`}>v{APP_VERSION}</div>
+  </div>
+</div>
 
               <div className={`border-t ${c.divider}`} />
 
@@ -923,7 +1008,7 @@ const handleFile = useCallback((file: File) => {
                   <Clock className={`w-4 h-4 mt-0.5 ${c.textMuted} flex-shrink-0`} />
                   <div>
                     <span className={c.textMuted}>Build: </span>
-                    <span className="font-medium">2026-03-05</span>
+                    <span className="font-medium">{__BUILD_DATE__}</span>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -1158,22 +1243,22 @@ const handleFile = useCallback((file: File) => {
     </div>
   </div>
 )}
-      {/* ── Header ── */}
-      <header className={`${c.header} border-b px-6 py-4`}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* App Icon */}
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center shadow-md p-1">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 1024 1024"
-                fill="currentColor" 
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-6 h-6 text-white"
-              >
-                {/* Poprawiona transformacja - usunąłem minus */}
-                <g transform="scale(0.12) scale(1, -1) translate(-500, -9200)">
+{/* ── Header ── */}
+<header className={`${c.header} border-b px-6 py-4`}>
+  <div className="max-w-7xl mx-auto flex items-center justify-between">
+    <div className="flex items-center gap-3">
+      {/* App Icon */}
+      <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center shadow-md p-1">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 1024 1024"
+          fill="currentColor" 
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-6 h-6 text-white"
+        >
+          {/* Poprawiona transformacja - usunąłem minus */}
+          <g transform="scale(0.12) scale(1, -1) translate(-500, -9200)">
                   <path
                     d="M4812 9249c-502-33-1031-178-1487-406-468-234-893-557-1221-925-357-402-591-772-777-1234-202-498-292-913-317-1459-12-267-3-3302 11-3483 19-263 104-439 279-582 79-63 199-127 292-154 32-9 102-21 155-26 124-12 3100-12 3583 0 595 15 872 56 1280 191 271 90 591 242 815 388 105 68 358 261 430 327 11 11 58 53 104 94 112 100 381 390 416 449 6 9 49 69 96 131 266 356 486 824 623 1325 91 331 132 626 142 1030 10 377-16 684-86 1038-31 154-43 200-108 408-129 417-401 940-663 1273-181 230-433 496-604 638-104 86-319 250-385 292-185 121-430 256-600 331-58 25-119 52-135 60-17 7-89 34-160 60-545 194-1110 273-1683 234z m658-1293c353-43 667-140 980-303 731-381 1267-1046 1465-1818 86-336 113-672 80-1005-30-316-86-544-214-870l-41-105-2616 0c-2440 0-2616 2-2625 17-15 26-83 203-118 305-211 618-195 1334 46 1956 37 96 163 355 209 429 213 346 480 636 804 874 120 89 404 252 511 294 29 12 72 30 97 41 197 90 547 171 857 199 123 12 413 4 565-14z m735-5223c73-26 158-113 179-183 34-113 7-220-74-301-84-84-12-79-1196-79-1011 0-1044 1-1088 20-25 10-65 37-90 60-132 121-115 348 33 446 84 55 34 53 1151 54 961 0 1039-1 1085-17z"
                     fill="currentColor"
@@ -1201,61 +1286,67 @@ const handleFile = useCallback((file: File) => {
                   <path
                     d="M7164 5976c-28-12-217-130-401-250-78-50-103-84-103-140 0-42 43-96 91-116 47-20 90-4 231 84 67 43 166 104 218 135 53 33 105 73 118 91 42 62 23 149-41 189-39 24-69 26-113 7z"
                     fill="currentColor"
-                  />
-                </g>
-              </svg>
-            </div>
-            <div>
-              <h1 className={`text-xl font-bold ${c.headerText}`}>{t.app_title}</h1>
-              <p className={`text-xs ${c.headerSub}`}>{t.app_subtitle}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {data.length > 0 && (
-              <div className="flex items-center gap-2 text-sm mr-2">
-                <span className={`${c.badge} px-3 py-1 rounded-full`}>{t.rows}: <strong>{data.length}</strong></span>
-                <span className={`${c.badgeGreen} px-3 py-1 rounded-full`}>{t.valid}: <strong>{validCount}</strong></span>
-                {invalidCount > 0 && <span className={`${c.badgeRed} px-3 py-1 rounded-full`}>{t.invalid}: <strong>{invalidCount}</strong></span>}
-              </div>
-            )}
-            {/* Help */}
-            <button onClick={() => setShowHelp(true)} className={`${c.btn} p-2 rounded-lg transition-colors`} title={t.help}>
-              <HelpCircle className="w-4 h-4" />
-            </button>
-            {/* About */}
-            <button onClick={() => setShowAbout(true)} className={`${c.btn} p-2 rounded-lg transition-colors`} title={t.about}>
-              <Info className="w-4 h-4" />
-            </button>
-            {/* Divider */}
-            <div className={`w-px h-6 ${theme === "dark" ? "bg-gray-700" : "bg-gray-300"}`} />
-
-            {/* Update button - tylko jeśli dostępna aktualizacja */}
-            {updateInfo && (
-              <button 
-                onClick={() => setShowUpdateModal(true)}
-                className={`${c.btn} p-2 rounded-lg transition-colors relative group`}
-                title={`${t.update_available}! v${APP_VERSION} → v${updateInfo.version}`}
-              >
-                <Download className="w-4 h-4 text-red-500" />
-                {/* Kropka powiadomienia */}
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></span>
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
-              </button>
-            )}
-            {/* Divider */}
-            <div className={`w-px h-6 ${theme === "dark" ? "bg-gray-700" : "bg-gray-300"}`} />
-            {/* Theme toggle */}
-            <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className={`${c.btn} p-2 rounded-lg transition-colors`} title={theme === "dark" ? "Light mode" : "Dark mode"}>
-              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-            {/* Language toggle */}
-            <button onClick={() => setLang(lang === "pl" ? "en" : "pl")} className={`${c.btn} px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors`}>
-              <Globe className="w-4 h-4" />
-              {lang === "pl" ? "🇵🇱 PL" : "🇬🇧 EN"}
-            </button>
-          </div>
+                  />          </g>
+        </svg>
+      </div>
+      <div>
+        <h1 className={`text-xl font-bold ${c.headerText}`}>{t.app_title}</h1>
+        <p className={`text-xs ${c.headerSub}`}>{t.app_subtitle}</p>
+      </div>
+    </div>
+    
+    <div className="flex items-center gap-2">
+      {data.length > 0 && (
+        <div className="flex items-center gap-2 text-sm mr-2">
+          <span className={`${c.badge} px-3 py-1 rounded-full`}>{t.rows}: <strong>{data.length}</strong></span>
+          <span className={`${c.badgeGreen} px-3 py-1 rounded-full`}>{t.valid}: <strong>{validCount}</strong></span>
+          {invalidCount > 0 && <span className={`${c.badgeRed} px-3 py-1 rounded-full`}>{t.invalid}: <strong>{invalidCount}</strong></span>}
         </div>
-      </header>
+      )}
+      
+      {/* Help */}
+      <button onClick={() => setShowHelp(true)} className={`${c.btn} p-2 rounded-lg transition-colors`} title={t.help}>
+        <HelpCircle className="w-4 h-4" />
+      </button>
+      
+      {/* About */}
+      <button onClick={() => setShowAbout(true)} className={`${c.btn} p-2 rounded-lg transition-colors`} title={t.about}>
+        <Info className="w-4 h-4" />
+      </button>
+    
+      <div className={`w-px h-6 ${theme === "dark" ? "bg-gray-700" : "bg-gray-300"}`} />
+    
+      {/* Update button - tylko jeśli dostępna aktualizacja */}
+      {updateInfo && (
+  <button 
+    onClick={() => setShowUpdateModal(true)}
+    className={`${c.btn} p-2 rounded-lg transition-colors relative group`}
+    title={`${t.update_available}! v${APP_VERSION} → v${updateInfo.version}`}
+  >
+    <Download className="w-4 h-4 text-red-500" />
+    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></span>
+    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+  </button>
+)}
+
+{/* Separator między Update a Theme - TYLKO gdy jest aktualizacja */}
+{updateInfo && (
+  <div className={`w-px h-6 ${theme === "dark" ? "bg-gray-700" : "bg-gray-300"}`} />
+)}
+
+{/* Theme toggle - BEZ separatora po */}
+<button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className={`${c.btn} p-2 rounded-lg transition-colors`}>
+  {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+</button>
+
+{/* Language toggle - BEZ separatora przed */}
+<button onClick={() => setLang(lang === "pl" ? "en" : "pl")} className={`${c.btn} px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors`}>
+  <Globe className="w-4 h-4" />
+  {lang === "pl" ? "🇵🇱 PL" : "🇬🇧 EN"}
+</button>
+    </div>
+  </div>
+</header>
 
       {/* ── Tabs ── */}
       <nav className={`${c.navBg} border-b`}>
@@ -1265,6 +1356,7 @@ const handleFile = useCallback((file: File) => {
             { key: "results" as TabKey, label: t.tab_results, icon: BarChart3, disabled: !model },
             { key: "estimation" as TabKey, label: t.tab_estimation, icon: Table, disabled: !model },
             { key: "predict" as TabKey, label: t.tab_prediction, icon: Calculator, disabled: !model },
+            { key: "homeassistant" as TabKey, label: t.tab_homeassistant, icon: Home, disabled: !model },
           ]).map(({ key, label, icon: Icon, disabled }) => (
             <button key={key} onClick={() => !disabled && setTab(key)} disabled={disabled}
               className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${tab === key ? c.tabActive : disabled ? `border-transparent ${c.tabDisabled} cursor-not-allowed` : `border-transparent ${c.tabInactive}`}`}>
@@ -1360,7 +1452,7 @@ const handleFile = useCallback((file: File) => {
                       <div><label className={`text-xs ${c.textMuted} block mb-1`}>HWC *</label><input type="number" placeholder="0" value={newRow.hwc} onChange={(e) => setNewRow({ ...newRow, hwc: e.target.value })} className={`w-full ${c.input} border rounded px-3 py-2 text-sm`} /></div>
                       <div><label className={`text-xs ${c.textMuted} block mb-1`}>{t.meter} *</label><input type="number" placeholder="0" step="0.001" value={newRow.meter} onChange={(e) => setNewRow({ ...newRow, meter: e.target.value })} className={`w-full ${c.input} border rounded px-3 py-2 text-sm`} /></div>
                       <div><label className={`text-xs ${c.textMuted} block mb-1`}>{t.comment}</label><input type="text" placeholder={t.optional} value={newRow.comment} onChange={(e) => setNewRow({ ...newRow, comment: e.target.value })} className={`w-full ${c.input} border rounded px-3 py-2 text-sm`} /></div>
-                    </div>``
+                    </div>
                     <div className="flex gap-2">
                       <button onClick={addRow} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"><CheckCircle className="w-4 h-4" /> {t.add}</button>
                       <button onClick={() => setShowAddForm(false)} className={`${c.btn} px-4 py-2 rounded-lg text-sm`}>{t.cancel}</button>
@@ -1486,33 +1578,55 @@ const handleFile = useCallback((file: File) => {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className={`${c.card} border rounded-xl p-5`}>
-                <div className={`text-xs ${c.textMuted} uppercase tracking-wider mb-1`}>{t.r2_train}</div>
-                <div className={`text-2xl font-bold ${c.textEmerald} mb-2`}>{(model.trainR2 * 100).toFixed(4)}%</div>
-                <div className={`w-full ${c.bar} rounded-full h-2`}>
-                  <div className="bg-emerald-500 h-2 rounded-full transition-all" style={{ width: `${Math.max(0, model.trainR2 * 100)}%` }} />
-                </div>
-              </div>
-              <div className={`${c.card} border rounded-xl p-5`}>
-                <div className={`text-xs ${c.textMuted} uppercase tracking-wider mb-1`}>{t.r2_test}</div>
-                <div className={`text-2xl font-bold ${c.textBlue2} mb-2`}>{(model.testR2 * 100).toFixed(4)}%</div>
-                <div className={`w-full ${c.bar} rounded-full h-2`}>
-                  <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${Math.max(0, model.testR2 * 100)}%` }} />
-                </div>
-              </div>
-            </div>
+<div className="grid md:grid-cols-2 gap-4">
+  {/* R² Training */}
+  <div className={`${c.card} border rounded-xl p-5 relative`}>
+    <CornerInfoIcon 
+      field="r2_train"
+      description={t.tooltip_r2_train      }
+    />
+    <div className={`text-xs ${c.textMuted} uppercase tracking-wider mb-1`}>{t.r2_train}</div>
+    <div className={`text-2xl font-bold ${c.textEmerald} mb-2`}>{(model.trainR2 * 100).toFixed(4)}%</div>
+    <div className={`w-full ${c.bar} rounded-full h-2`}>
+      <div className="bg-emerald-500 h-2 rounded-full transition-all" style={{ width: `${Math.max(0, model.trainR2 * 100)}%` }} />
+    </div>
+  </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className={`${c.card} border rounded-xl p-5`}>
-                <div className={`text-xs ${c.textMuted} uppercase tracking-wider mb-1`}>{t.mae}</div>
-                <div className={`text-2xl font-mono font-bold ${c.textOrange}`}>{model.mae.toFixed(6)}</div>
-              </div>
-              <div className={`${c.card} border rounded-xl p-5`}>
-                <div className={`text-xs ${c.textMuted} uppercase tracking-wider mb-1`}>{t.rmse}</div>
-                <div className={`text-2xl font-mono font-bold ${c.textRose}`}>{model.rmse.toFixed(6)}</div>
-              </div>
-            </div>
+  {/* R² Testing */}
+  <div className={`${c.card} border rounded-xl p-5 relative`}>
+    <CornerInfoIcon 
+      field="r2_test"
+      description={t.tooltip_r2_test}     
+    />
+    <div className={`text-xs ${c.textMuted} uppercase tracking-wider mb-1`}>{t.r2_test}</div>
+    <div className={`text-2xl font-bold ${c.textBlue2} mb-2`}>{(model.testR2 * 100).toFixed(4)}%</div>
+    <div className={`w-full ${c.bar} rounded-full h-2`}>
+      <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${Math.max(0, model.testR2 * 100)}%` }} />
+    </div>
+  </div>
+</div>
+
+<div className="grid md:grid-cols-2 gap-4">
+  {/* MAE */}
+  <div className={`${c.card} border rounded-xl p-5 relative`}>
+    <CornerInfoIcon 
+      field="mae"
+      description={t.tooltip_mae}      
+    />
+    <div className={`text-xs ${c.textMuted} uppercase tracking-wider mb-1`}>{t.mae}</div>
+    <div className={`text-2xl font-mono font-bold ${c.textOrange}`}>{model.mae.toFixed(6)}</div>
+  </div>
+
+  {/* RMSE */}
+  <div className={`${c.card} border rounded-xl p-5 relative`}>
+    <CornerInfoIcon 
+      field="rmse"
+      description={t.tooltip_rmse} 
+    />
+    <div className={`text-xs ${c.textMuted} uppercase tracking-wider mb-1`}>{t.rmse}</div>
+    <div className={`text-2xl font-mono font-bold ${c.textRose}`}>{model.rmse.toFixed(6)}</div>
+  </div>
+</div>
           </div>
         )}
 
@@ -1586,6 +1700,83 @@ const handleFile = useCallback((file: File) => {
                   <div className={`text-xs ${c.textMuted} mt-2 font-mono`}>
                     = {model.intercept.toFixed(4)} + {predHC} × {model.coefficients[0].toExponential(4)} + {predHWC} × {model.coefficients[1].toExponential(4)}
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+                {/* ══════ TAB: HOME ASSISTANT ══════ */}
+        {tab === "homeassistant" && model && (
+          <div className="max-w-2xl mx-auto space-y-6">
+            <div className={`${c.card} border rounded-xl p-6 space-y-5`}>
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Home className={`w-5 h-5 ${c.textAmber2}`} />
+                {t.ha_title}
+              </h2>
+              <p className={`text-sm ${c.textMuted}`}>{t.ha_desc}</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className={`text-xs ${c.textMuted} block mb-1`}>{t.ha_sensor_name}</label>
+                  <input
+                    type="text"
+                    value={haSensorName}
+                    onChange={(e) => setHaSensorName(e.target.value)}
+                    placeholder={t.ha_placeholder_name}
+                    className={`w-full ${c.input} border rounded-lg px-4 py-3 ${c.inputFocus} focus:outline-none`}
+                  />
+                </div>
+                <div>
+                  <label className={`text-xs ${c.textMuted} block mb-1`}>{t.ha_sensor_hc}</label>
+                  <input
+                    type="text"
+                    value={haHcSensor}
+                    onChange={(e) => setHaHcSensor(e.target.value)}
+                    placeholder={t.ha_placeholder_hc}
+                    className={`w-full ${c.input} border rounded-lg px-4 py-3 ${c.inputFocus} focus:outline-none font-mono text-sm`}
+                  />
+                </div>
+                <div>
+                  <label className={`text-xs ${c.textMuted} block mb-1`}>{t.ha_sensor_hwc}</label>
+                  <input
+                    type="text"
+                    value={haHwcSensor}
+                    onChange={(e) => setHaHwcSensor(e.target.value)}
+                    placeholder={t.ha_placeholder_hwc}
+                    className={`w-full ${c.input} border rounded-lg px-4 py-3 ${c.inputFocus} focus:outline-none font-mono text-sm`}
+                  />
+                </div>
+
+                <button
+                  onClick={generateHaYaml}
+                  className={`${c.btnPrimary} px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                >
+                  <Play className="w-4 h-4" />
+                  {t.ha_generate}
+                </button>
+              </div>
+
+              {haYaml && (
+                <div className="space-y-3">
+                  <div className={`flex items-center justify-between`}>
+                    <p className={`text-xs ${c.textMuted}`}>
+                      💡 {t.ha_note}
+                    </p>
+                    <button
+                      onClick={copyHaYaml}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        haCopied
+                          ? "bg-emerald-600/20 text-emerald-400 ring-1 ring-emerald-500/30"
+                          : `${c.btnGreen}`
+                      }`}
+                    >
+                      {haCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      {haCopied ? t.ha_copied : t.ha_copy}
+                    </button>
+                  </div>
+                  <pre className={`${c.mono} border ${c.divider} rounded-xl p-4 text-sm font-mono overflow-x-auto whitespace-pre leading-relaxed`}>
+                    {haYaml}
+                  </pre>
                 </div>
               )}
             </div>

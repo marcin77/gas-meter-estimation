@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-11
+
+### Added
+- **Home Assistant sensor YAML generator** — new tab with configurable sensor names and one-click copy
+- PWA support — installable as desktop/mobile app from browser
+- Bilingual sensor name in HA generator (PL/EN)
+- Information icons (i) with tooltips for all metrics (R², MAE, RMSE) in PL/EN
+
+### Changed
+- Replaced vite-plugin-singlefile with vite-plugin-pwa
+- Update dialog date format changed to ISO (YYYY-MM-DD)
+- Header separators only visible when update is available
+- Improved SVG icon orientation, positioning and centering in About modal
+- Dynamic version (v{APP_VERSION}) in About modal instead of hardcoded
+- Automatic build date via Vite define
+
+### Fixed
+- Update date parsing showing wrong month/day order
+- Separator visibility logic based on update availability
+
+### Technical
+- Improved clipboard copy system
+
 ## [1.1.0] - 2026-03-08
 
 ### Added
